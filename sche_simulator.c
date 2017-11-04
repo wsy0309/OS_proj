@@ -3,6 +3,7 @@ io_time : 3
 cpu_time : 4
 time quantum : 2
 */
+
 #include "procqADT.h"
 #include <stdio.h>
 #include <unistd.h>
@@ -88,8 +89,10 @@ int main(){
 		printf("msgget error \n");
 		exit(0);
 	}
+	printf("msg (key : 0x%x, id:0x%x) created\n",QUEUE_KEY, msgpid);
+
 	while(1){
-		if((msgrcv(msgpid, &msg, (sizeof(msg) - sizeof(long)), 0, IPC_NOWAIT)) == -1){
+		if((msgrcv(msgpid, &msg, (sizeof(msg) - sizeof(long)), 0, NULL)) == -1){
 			printf("msgrcv error \n");
 			exit(0);
 		}
@@ -100,6 +103,7 @@ int main(){
 					pcbs[i]->remain_time_quantum = 0;
 					RemoveProcq(runq, pcbs[i]);
 					AddProcq(waitq, pcbs[i]);
+					printf("global_tick (%d) proc(%d) sleep (%d) ticks\n", global_tick, pcbs[i]->pid, pcbs[i]->remain_io_time);
 				}
 			}
 			next = scheduler();
@@ -126,15 +130,19 @@ void pAlarmHandler(int signo){
 	//waitq update
 	if(waitq->count != 0)
 		updateWaitq();
-	if(present == NULL)
+	if(present == NULL){
 		present = scheduler();
+		printf("global_tick(%d) schedule proc(%d)\n",global_tick, present->pid);
+	}
 	else{
 		present->remain_time_quantum--;
 		if(present->remain_time_quantum == 0){
 			RemoveProcq(runq, present);
 			AddProcq(waitq, present);
-			if((next = scheduler()) != NULL)
+			if((next = scheduler()) != NULL){
 				present = next;
+				printf("global_tick(%d) schedule proc(%d)\n",global_tick, present->pid);
+			}
 		}	
 	}
 	kill(present->pid, SIGALRM);
@@ -183,7 +191,7 @@ void io_action(){
 	msg.io_time = 3;
 	msg.msgType = 1;
 
-	if((msgsnd(mspid, &msg, (sizeof(msg) - sizeof(long)), 0)) == -1){
+	if((msgsnd(mspid, &msg, (sizeof(msg) - sizeof(long)), IPC_NOWAIT)) == -1){
 		printf("msgsnd error \n");
 		exit(0);
 	}
