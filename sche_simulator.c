@@ -37,6 +37,7 @@ void updateWaitq();
 void child_action();
 void io_action();
 Pcb* scheduler();
+key_t msgpid;
 
 int main(){
 	int pid, i;
@@ -84,32 +85,30 @@ int main(){
 	new_timer.it_interval.tv_usec = 0;
 	setitimer(ITIMER_REAL, &new_timer, &old_timer);
 
-	key_t msgpid;
+//	key_t msgpid;
 	if((msgpid = msgget((key_t)QUEUE_KEY, IPC_CREAT|0644)) == -1){
 		printf("msgget error \n");
 		exit(0);
 	}
-	printf("msg (key : 0x%x, id:0x%x) created\n",QUEUE_KEY, msgpid);
+	printf("msg (key : %d, id : %d) created\n",QUEUE_KEY, msgpid);
 
 	while(1){
-		if((msgrcv(msgpid, &msg, (sizeof(msg) - sizeof(long)), 0, NULL)) == -1){
-			printf("msgrcv error \n");
-			exit(0);
-		}
-		else{
-			for(i = 0; i<10; i++){
-				if(pcbs[i]->pid == msg.pid){
-					pcbs[i]->remain_io_time = msg.io_time;
-					pcbs[i]->remain_time_quantum = 0;
-					RemoveProcq(runq, pcbs[i]);
-					AddProcq(waitq, pcbs[i]);
-					printf("global_tick (%d) proc(%d) sleep (%d) ticks\n", global_tick, pcbs[i]->pid, pcbs[i]->remain_io_time);
+		if(msgpid > 0){
+			if((msgrcv(msgpid, &msg, (sizeof(msg) - sizeof(long)), 0, 0)) > 0){
+				for(i = 0; i<10; i++){
+					if(pcbs[i]->pid == msg.pid){
+						pcbs[i]->remain_io_time = msg.io_time;
+						pcbs[i]->remain_time_quantum = 0;
+						RemoveProcq(runq, pcbs[i]);
+						AddProcq(waitq, pcbs[i]);
+						printf("global_tick (%d) proc(%d) sleep (%d) ticks\n", global_tick, pcbs[i]->pid, pcbs[i]->remain_io_time);
+					}
 				}
+				next = scheduler();
+				if(next != NULL)
+					present = next;
+				///여기서 끝....?
 			}
-			next = scheduler();
-			if(next != NULL)
-				present = next;
-			///여기서 끝....?
 		}
 	}
 	exit(0);
@@ -138,7 +137,7 @@ void pAlarmHandler(int signo){
 		present->remain_time_quantum--;
 		if(present->remain_time_quantum == 0){
 			RemoveProcq(runq, present);
-			AddProcq(waitq, present);
+			AddProcq(runq, present);
 			if((next = scheduler()) != NULL){
 				present = next;
 				printf("global_tick(%d) schedule proc(%d)\n",global_tick, present->pid);
@@ -150,9 +149,12 @@ void pAlarmHandler(int signo){
 
 void cAlarmHandler(int signo){
 	present->remain_cpu_time--;
-	if(present->remain_cpu_time <= 0)
+	printf("proc(%d) remain_cpu_time : %d\n ",present->pid, present->remain_cpu_time);
+	if(present->remain_cpu_time <= 0){
+		printf("start io_action\n");
 		io_action();	
-	exit(0);
+	}
+	return;
 }
 
 void updateWaitq(){
@@ -169,19 +171,21 @@ void updateWaitq(){
 
 void child_action(){
 	struct sigaction old_sa, new_sa;
-
+	printf("into child_Action\n");
 	memset(&new_sa,0,sizeof(sigaction));
 	new_sa.sa_handler = &cAlarmHandler;
 	sigaction(SIGALRM, &new_sa, &old_sa);
 
-	//msg initial ???
+	msgpid = (key_t)malloc(sizeof(key_t));
+	msgpid = -1;
+
 	while(1){
 	}
 }
 
 void io_action(){
 	int mspid, ret;
-
+	printf("child (%d) send msg\n",present->pid);
 	if((mspid = msgget((key_t)QUEUE_KEY, IPC_CREAT|0644)) == -1){
 		printf("msgget error \n");
 		exit(0);
