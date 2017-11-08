@@ -263,8 +263,8 @@ void PrintQueue(Procq* q){
 void searchShort(){
 	int i, j;
 	Pcb * temp = NULL;
-	for(i = 0; i < 9; i++){
-		for(j = i + 1; j < 9; j++){
+	for(i = 0; i <= 9; i++){
+		for(j = i + 1; j <= 9; j++){
 			if(pcbs[i]->remain_cpu_time > pcbs[j]->remain_cpu_time){
 				temp = pcbs[i];
 				pcbs[i] = pcbs[j];
@@ -272,7 +272,7 @@ void searchShort(){
 			}
 		}
 	}
-	for(i = 0; i < 9; i++){
+	for(i = 0; i <= 9; i++){
 		printf("add proc(%d) cpu_time(%d)\n",pcbs[i]->pid, pcbs[i]->remain_cpu_time);
 		AddProcq(runq, pcbs[i]);
 	}
