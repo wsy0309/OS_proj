@@ -2,8 +2,9 @@
 [ Project 1 ]
 RR scheduling policy
 
-cpu_time :  random
-io_time  :  random
+time_quantum :  2
+cpu_time     :  random
+io_time      :  random
 **********************************************/
 
 #include "procqADT.h" //linked list
@@ -64,7 +65,7 @@ int main(){
 	srand((int)time(NULL));
 	for(i = 0; i<10; i++){
 		cpu_time[i] = (rand() % 10) + 1;
-		//printf("create cpu_time : %d\n",cpu_time[i]);	
+		printf("create cpu_time : %d\n",cpu_time[i]);	
 	}
 
 	for(i = 0; i<10; i++){
@@ -113,6 +114,7 @@ int main(){
 				for(i = 0; i<10; i++){
 					if(pcbs[i]->pid == msg.pid){
 						pcbs[i]->remain_io_time = msg.io_time;
+						pcbs[i]->remain_cpu_time = msg.cpu_time;
 						pcbs[i]->remain_time_quantum = 2;
 						RemoveProcq(runq, pcbs[i]);
 						AddProcq(waitq, pcbs[i]);
@@ -159,6 +161,7 @@ void pAlarmHandler(int signo){
 	else{
 		present->remain_time_quantum--;
 		if(present->remain_time_quantum == 0){
+			present->remain_time_quantum = 2;
 			RemoveProcq(runq, present);
 			AddProcq(runq, present);
 			if((next = scheduler()) != NULL){
